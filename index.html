@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Minimalne drzewa rozpinające: Prim i Kruskal</title>
+<style>:root{
+  --beige:#fff5d7; --coral:#ff5e6c; --yellow:#feb300; --pink:#ffaaab;
+  --plum:#2b1630; --plum2:#5a3d5f; --card:#fffaf0; --line:#e8d9a8;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--beige);color:var(--plum);font-family:-apple-system,"Segoe UI",Helvetica,Arial,sans-serif;font-size:19px;line-height:1.55}
+#stage{position:absolute;left:50%;top:50%;width:1280px;height:720px;transform-origin:50% 50%}
+#app{height:100%;padding:14px 40px 16px;display:flex;flex-direction:column}
+header{display:flex;align-items:center;justify-content:space-between;font-size:14px;letter-spacing:.08em;text-transform:uppercase;font-weight:600}
+header .logo{font-family:"Abril Fatface","Bodoni 72","Didot",Georgia,serif;font-size:24px;letter-spacing:0;text-transform:none}
+header .logo span{color:var(--coral)}
+h1,h2{font-family:"Abril Fatface","Bodoni 72","Didot",Georgia,serif;font-weight:900;margin:0;line-height:1.05;color:var(--plum)}
+h1{font-size:80px}
+h2{font-size:40px;margin:10px 0 10px}
+h3{font-size:20px;margin:0 0 5px;font-weight:700}
+main{flex:1;min-height:0;overflow:hidden;position:relative}
+#fit{transform-origin:0 0;display:flow-root}
+p{margin:6px 0}
+.muted{color:var(--plum2);font-size:15px}
+.btn{font:inherit;font-weight:700;font-size:15px;letter-spacing:.06em;text-transform:uppercase;padding:10px 20px;border-radius:6px;border:1.5px solid var(--plum);background:transparent;color:var(--plum);cursor:pointer}
+.btn.pri{background:var(--coral);border-color:var(--coral)}
+.btn:disabled{opacity:.35;cursor:default}
+.btn:not(:disabled):hover{filter:brightness(.96)}
+.card{background:var(--card);border:1.5px solid var(--plum);border-radius:12px;padding:12px 18px}
+.card.pink{background:var(--pink);border-color:var(--pink)}
+.card.yellow{background:var(--yellow);border-color:var(--yellow)}
+.card.coral{background:var(--coral);border-color:var(--coral)}
+.grid{display:grid;gap:16px}
+.grid>*{min-width:0}
+.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:repeat(3,1fr)}
+pre{margin:8px 0;background:var(--card);border:1.5px solid var(--plum);border-radius:10px;padding:12px 16px;font:16px/1.55 ui-monospace,Menlo,Consolas,monospace;color:var(--plum);overflow:auto;white-space:pre}
+pre.py{font-size:14px;line-height:1.55;padding:10px 14px}
+pre i{color:var(--plum2);font-style:normal}
+table{border-collapse:collapse;width:100%}
+th,td{text-align:left;padding:7px 12px;border-bottom:1.5px solid var(--line);font-size:16px;vertical-align:top}
+th{font-size:13px;letter-spacing:.07em;text-transform:uppercase}
+.chip{display:inline-block;padding:2px 11px;border-radius:6px;font-size:15px;font-weight:600;margin:3px 4px 3px 0;border:1.5px solid var(--plum);background:var(--card)}
+.chip.take{background:var(--coral);border-color:var(--coral)}
+.chip.rej{background:var(--plum);border-color:var(--plum);color:var(--beige);text-decoration:line-through}
+.chip.cur{outline:3px solid var(--yellow);outline-offset:1px}
+.chip.off{opacity:.4}
+.legend{display:flex;gap:18px;flex-wrap:wrap;font-size:14px;margin:4px 0}
+.legend span{display:inline-flex;align-items:center;gap:7px}
+.legend svg{display:block}
+.steps{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:6px 0}
+.say{min-height:3em;font-size:19px}
+.stat{font-size:30px;font-weight:700;font-family:"Abril Fatface","Bodoni 72","Didot",Georgia,serif}
+nav.bar{display:flex;align-items:center;gap:14px;border-top:1.5px solid var(--plum);padding-top:12px}
+.prog{flex:1;height:8px;background:var(--line);border-radius:4px;overflow:hidden}
+.prog div{height:100%;background:var(--coral);transition:width .25s}
+.count{font-size:14px;font-weight:600;min-width:56px;text-align:center}
+input[type=range]{accent-color:var(--coral);width:100%}
+.bar1,.bar2{height:18px;border-radius:5px}
+.mx{table-layout:fixed}
+.mx th,.mx td{text-align:center;padding:5px 10px;font-size:17px;white-space:nowrap}
+.mx tr>:first-child{width:96px}
+.mx th{font-size:15px;letter-spacing:0;text-transform:none}
+</style>
+</head>
+<body>
+<div id="stage"><div id="app">
+  <header><div class="logo">MST</div><div>Prim i Kruskal</div></header>
+  <main id="slide"></main>
+  <nav class="bar"><button class="btn" id="prev">← Wstecz</button><div class="prog"><div id="pg"></div></div><div class="count" id="ct"></div><button class="btn pri" id="next">Dalej →</button></nav>
+</div></div>
+<script>
+var PL='#2b1630',BG='#fff5d7',CORAL='#ff5e6c',YEL='#feb300',PINK='#ffaaab',CARD='#fffaf0';
+
+/* ---------- rysowanie grafów ---------- */
+function key(u,v){return u<v?u+v:v+u}
+function edgeStyle(st){
+  if(st==='take')return 'stroke="'+CORAL+'" stroke-width="6"';
+  if(st==='cand')return 'stroke="'+YEL+'" stroke-width="6"';
+  if(st==='rej')return 'stroke="'+PL+'" stroke-width="3" stroke-dasharray="8 6"';
+  return 'stroke="'+PL+'" stroke-width="1.6" opacity="0.28"';
+}
+function graph(nodes,edges,o){
+  o=o||{};var es=o.es||function(){return 'dim'},nf=o.nf||function(){return null},W=o.w||680,H=o.h||300,r=o.r||19,fsz=o.fsz||16,lfs=o.lfs||14,lw=o.lw||28,lh=o.lh||22;
+  var s='<svg width="100%" viewBox="'+(o.vb||('0 0 '+W+' '+H))+'" role="img" aria-label="'+(o.label||'Graf')+'">';
+  var order={dim:0,cand:1,rej:2,take:3},list=edges.map(function(e){return {e:e,st:es(key(e[0],e[1]))}});
+  list.sort(function(a,b){return order[a.st]-order[b.st]});
+  list.forEach(function(it){var e=it.e,a=nodes[e[0]],b=nodes[e[1]];
+    s+='<line x1="'+a[0]+'" y1="'+a[1]+'" x2="'+b[0]+'" y2="'+b[1]+'" '+edgeStyle(it.st)+' stroke-linecap="round"/>';});
+  s+=o.under||'';
+  list.forEach(function(it){var e=it.e;if(e[2]==null||o.nolabel)return;
+    var a=nodes[e[0]],b=nodes[e[1]],t=(o.lt&&o.lt[key(e[0],e[1])])||0.5,mx=a[0]+(b[0]-a[0])*t,my=a[1]+(b[1]-a[1])*t,rej=it.st==='rej';
+    s+='<rect x="'+(mx-lw/2)+'" y="'+(my-lh/2)+'" width="'+lw+'" height="'+lh+'" rx="6" fill="'+(rej?PL:BG)+'" stroke="'+PL+'" stroke-width="1.2"/>';
+    s+='<text x="'+mx+'" y="'+my+'" text-anchor="middle" dominant-baseline="central" style="font-size:'+lfs+'px;font-weight:700;fill:'+(rej?BG:PL)+'">'+e[2]+'</text>';});
+  for(var v in nodes){var p=nodes[v],c=nf(v);
+    if(o.ring&&o.ring(v))s+='<circle cx="'+p[0]+'" cy="'+p[1]+'" r="'+(r+7)+'" fill="none" stroke="'+PL+'" stroke-width="3"/>';
+    s+='<circle cx="'+p[0]+'" cy="'+p[1]+'" r="'+r+'" fill="'+(c||CARD)+'" stroke="'+PL+'" stroke-width="2.2"/>';
+    s+='<text x="'+p[0]+'" y="'+p[1]+'" text-anchor="middle" dominant-baseline="central" style="font-size:'+fsz+'px;font-weight:700;fill:'+PL+'">'+v+'</text>';}
+  s+=(o.extra||'')+'</svg>';
+  return o.cap?'<div style="max-width:840px;margin:0 auto">'+s+'</div>':s;
+}
+function legend(items,labels){
+  var d={take:['Krawędź wybrana',CORAL,''],cand:['Kandydat',YEL,''],rej:['Odrzucona (cykl)',PL,'7 5']};
+  return '<div class="legend">'+items.map(function(k,j){var i=d[k],t=labels&&labels[j]?labels[j]:i[0];return '<span><svg width="30" height="10"><line x1="2" y1="5" x2="28" y2="5" stroke="'+i[1]+'" stroke-width="'+(k==='rej'?3:6)+'" stroke-linecap="round" stroke-dasharray="'+i[2]+'"/></svg>'+t+'</span>'}).join('')+'</div>';
+}
+
+/* ---------- dane: graf przykładowy (6 wierzchołków) ---------- */
+var N={A:[90,90],B:[270,50],C:[470,70],D:[600,190],E:[400,230],F:[160,250]};
+var NB={A:[99,112],B:[297,62],C:[517,88],D:[660,238],E:[440,288],F:[176,312]};
+var BIG={w:760,h:370,r:24,fsz:18,lfs:16,lw:34,lh:26};
+var EL=[['A','B',4],['A','F',2],['B','F',5],['B','C',7],['B','E',3],['C','E',8],['C','D',9],['D','E',1],['E','F',6]];
+var SORTED=['DE','AF','BE','AB','BF','EF','BC','CE','CD'];
+var WT={};EL.forEach(function(e){WT[key(e[0],e[1])]=e[2]});
+function ms(keys,st,base){return function(k){return keys.indexOf(k)>=0?st:(base||'dim')}}
+function big(o){var r={};for(var k in BIG)r[k]=BIG[k];for(var k2 in o)r[k2]=o[k2];return r}
+
+/* ---------- Prim ---------- */
+var PR=[
+{S:'A',T:[],C:['AB','AF'],X:[],t:'Start w wierzchołku A: S = {A}. Krawędzie wychodzące z A, AB (4) i AF (2), są kandydatami. Najmniejsza waga: AF.'},
+{S:'AF',T:['AF'],C:['AB','BF','EF'],X:[],t:'Dołączamy AF, wierzchołek F wchodzi do S. Nowi kandydaci: BF (5) i EF (6). Najmniejsza waga: AB (4).'},
+{S:'AFB',T:['AF','AB'],C:['BC','BE','EF'],X:['BF'],t:'Dołączamy AB. Krawędź BF (5) zostanie odrzucona: oba jej końce są już w S, więc utworzyłaby cykl. Z pozostałych najmniejsza waga: BE (3).'},
+{S:'AFBE',T:['AF','AB','BE'],C:['BC','CE','DE'],X:['BF','EF'],t:'Dołączamy BE. Odrzucona zostanie też EF (6): jej końce E i F są już w S. Najmniejsza waga: DE (1).'},
+{S:'AFBED',T:['AF','AB','BE','DE'],C:['BC','CE','CD'],X:['BF','EF'],t:'Dołączamy DE. BF i EF nadal utworzyłyby cykl, więc zostaną pominięte. Z pozostałych kandydatów najlżejsza jest BC (7).'},
+{S:'AFBEDC',T:['AF','AB','BE','DE','BC'],C:[],X:['BF','EF','CE','CD'],t:'Dołączamy BC. Wszystkie wierzchołki są w S: 5 krawędzi = n−1. Suma wag 2+4+3+1+7 = 17 (wszystkie krawędzie grafu razem: 45). Koniec.'}];
+
+/* ---------- Kruskal ---------- */
+var COL=[PINK,CORAL];
+var KR=[
+{T:[],R:[],cur:-1,I:[],t:'Krawędzie posortowane rosnąco po wadze (lista po prawej). Na start każdy wierzchołek to osobne poddrzewo: 6 poddrzew.'},
+{T:['DE'],R:[],cur:0,I:[['DE',0]],t:'DE (1): D i E są w różnych poddrzewach, więc bierzemy krawędź i łączymy je w jedno poddrzewo.'},
+{T:['DE','AF'],R:[],cur:1,I:[['DE',0],['AF',1]],t:'AF (2): różne poddrzewa, bierzemy. Mamy dwa poddrzewa po dwa wierzchołki.'},
+{T:['DE','AF','BE'],R:[],cur:2,I:[['BDE',0],['AF',1]],t:'BE (3): B jest osobno, E w poddrzewie z D. Różne poddrzewa, B dołącza.'},
+{T:['DE','AF','BE','AB'],R:[],cur:3,I:[['ABDEF',0]],t:'AB (4): oba końce należą już do jakichś poddrzew, ale do <b>różnych</b> ({A,F} i {B,D,E}). Krawędź łączy je w jedno, cyklu nie ma.'},
+{T:['DE','AF','BE','AB'],R:['BF'],cur:4,I:[['ABDEF',0]],t:'BF (5): B i F są w <b>tym samym</b> poddrzewie. Ta krawędź zamknęłaby cykl A–B–F, więc ją odrzucamy.'},
+{T:['DE','AF','BE','AB'],R:['BF','EF'],cur:5,I:[['ABDEF',0]],t:'EF (6): E i F też są w tym samym poddrzewie. Znowu cykl, odrzucamy.'},
+{T:['DE','AF','BE','AB','BC'],R:['BF','EF'],cur:6,I:[['ABCDEF',0]],t:'BC (7): C dołącza. Mamy 5 = n−1 krawędzi i jedno poddrzewo, więc stop: CE i CD nie są sprawdzane. Suma wag: 17 (wszystkie krawędzie: 45).'}];
+
+/* ---------- Union-Find ---------- */
+var UF=[
+{p:{A:'A',B:'B',C:'C',D:'D',E:'E',F:'F'},ch:[],e:'start',t:'Na początku każdy wierzchołek jest własnym korzeniem (parent[x] = x): 6 jednowierzchołkowych poddrzew.'},
+{p:{A:'A',B:'B',C:'C',D:'E',E:'E',F:'F'},ch:['D'],e:'DE',t:'DE: find(D) = D, find(E) = E, różne korzenie, więc parent[D] = E. Poddrzewa połączone.'},
+{p:{A:'F',B:'B',C:'C',D:'E',E:'E',F:'F'},ch:['A'],e:'AF',t:'AF: find(A) = A, find(F) = F, różne. parent[A] = F.'},
+{p:{A:'F',B:'E',C:'C',D:'E',E:'E',F:'F'},ch:['B'],e:'BE',t:'BE: find(B) = B, find(E) = E, różne. parent[B] = E.'},
+{p:{A:'F',B:'E',C:'C',D:'E',E:'E',F:'E'},ch:['F'],e:'AB',t:'AB: find(A) idzie A→F, korzeń F. find(B) = E. Różne korzenie, więc parent[F] = E: podpinamy korzeń poddrzewa {A, F} pod korzeń poddrzewa {B, D, E}. Krawędź AB trafia do MST, ale w strukturze Union-Find nie powstaje linia A–B.'},
+{p:{A:'F',B:'E',C:'C',D:'E',E:'E',F:'E'},ch:[],e:'BF',rej:1,t:'BF: find(B) = E, find(F) = E. <b>Ten sam</b> korzeń, więc B i F są w jednym poddrzewie: cykl, odrzucamy. Struktura się nie zmienia.'},
+{p:{A:'F',B:'E',C:'C',D:'E',E:'E',F:'E'},ch:[],e:'EF',rej:1,t:'EF: find(E) = E, find(F) = E. Ten sam korzeń: cykl, odrzucamy. Wykrycie cyklu to dwa wywołania find i jedno porównanie.'},
+{p:{A:'F',B:'E',C:'C',D:'E',E:'C',F:'E'},ch:['E'],e:'BC',t:'BC: find(B) = E, find(C) = C, różne. parent[E] = C. Mamy 5 krawędzi, stop. Jeden korzeń C, jedno poddrzewo.'},
+{p:{A:'C',B:'E',C:'C',D:'E',E:'C',F:'C'},ch:['A','F'],e:'bonus',t:'Dodatkowo, kompresja ścieżek: find(A) idzie A→F→E→C. Po drodze każdy odwiedzony wierzchołek podpinamy bezpośrednio pod korzeń C. Następne find(A) to jeden krok.'}];
+var UFT=[[],['DE'],['DE','AF'],['DE','AF','BE'],['DE','AF','BE','AB'],['DE','AF','BE','AB'],['DE','AF','BE','AB'],['DE','AF','BE','AB','BC'],['DE','AF','BE','AB','BC']];
+UF[4].x='<b>Dlaczego F pod E, a nie A pod B?</b> Ustawienie parent[A] = B oderwałoby od F samo A, a F i reszta poddrzewa zostałyby bez niego. Żeby połączyć całe poddrzewa, łączymy ich <b>korzenie</b>: F (poddrzewo z A) i E (poddrzewo z B i D).';
+function forest(p,ch){
+  var ids='ABCDEF'.split(''),kids={};ids.forEach(function(v){kids[v]=[]});
+  var roots=[];ids.forEach(function(v){if(p[v]===v)roots.push(v);else kids[p[v]].push(v)});
+  function wd(v){return kids[v].length?kids[v].reduce(function(a,c){return a+wd(c)},0):1}
+  var total=roots.reduce(function(a,r){return a+wd(r)},0),sw=Math.min(90,640/total),x0=(680-total*sw)/2,pos={},cur=0,maxd=0;
+  function place(v,d,left){var w=wd(v),c=left;kids[v].sort();kids[v].forEach(function(k){place(k,d+1,c);c+=wd(k)});pos[v]=[x0+(left+w/2)*sw,32+d*58];maxd=Math.max(maxd,d)}
+  roots.sort().forEach(function(r){place(r,0,cur);cur+=wd(r)});
+  var s='<svg width="100%" viewBox="0 0 680 246" role="img" aria-label="Drzewa Union-Find">';
+  ids.forEach(function(v){if(p[v]!==v){var a=pos[v],b=pos[p[v]];s+='<line x1="'+a[0]+'" y1="'+a[1]+'" x2="'+b[0]+'" y2="'+b[1]+'" stroke="'+(ch.indexOf(v)>=0?CORAL:PL)+'" stroke-width="'+(ch.indexOf(v)>=0?5:2)+'" stroke-linecap="round"/>'}});
+  ids.forEach(function(v){var a=pos[v],isr=p[v]===v;
+    s+='<circle cx="'+a[0]+'" cy="'+a[1]+'" r="19" fill="'+(isr?YEL:PINK)+'" stroke="'+PL+'" stroke-width="2.2"/><text x="'+a[0]+'" y="'+a[1]+'" text-anchor="middle" dominant-baseline="central" style="font-size:16px;font-weight:700;fill:'+PL+'">'+v+'</text>';
+    if(isr&&kids[v].length)s+='<text x="'+(a[0]+26)+'" y="'+(a[1]-18)+'" style="font-size:12px;font-weight:600;fill:'+PL+'">korzeń</text>'});
+  return s+'</svg>';
+}
+
+/* ---------- klikany graf (slajd 4) ---------- */
+function plPod(n){return n==1?'poddrzewo':(n>=2&&n<=4?'poddrzewa':'poddrzew')}
+var CGN={A:[70,60],B:[220,30],C:[370,70],D:[310,190],E:[110,180]};
+var CGE=['AB','BC','CD','DE','AE','BE','BD'];
+function cgT(k){var i=st.cg.indexOf(k);if(i>=0)st.cg.splice(i,1);else st.cg.push(k);R()}
+function cgInfo(){var p={};'ABCDE'.split('').forEach(function(v){p[v]=v});function f(x){while(p[x]!==x)x=p[x];return x}var c=5;
+  st.cg.forEach(function(k){var a=f(k[0]),b=f(k[1]);if(a!==b){p[a]=b;c--}});return {m:st.cg.length,c:c,cyc:st.cg.length>5-c}}
+function cgGraph(){
+  var s='<svg width="100%" viewBox="0 0 440 232" role="img" aria-label="Graf do klikania">';
+  CGE.forEach(function(k){var a=CGN[k[0]],b=CGN[k[1]],on=st.cg.indexOf(k)>=0;
+    s+='<line x1="'+a[0]+'" y1="'+a[1]+'" x2="'+b[0]+'" y2="'+b[1]+'" stroke="'+(on?CORAL:PL)+'" stroke-width="'+(on?6:2)+'" '+(on?'':'opacity="0.35" stroke-dasharray="3 6"')+' stroke-linecap="round"/>';
+    s+='<line x1="'+a[0]+'" y1="'+a[1]+'" x2="'+b[0]+'" y2="'+b[1]+'" stroke="transparent" stroke-width="26" style="cursor:pointer" onclick="cgT(\''+k+'\')"/>'});
+  for(var v in CGN){var p=CGN[v];s+='<circle cx="'+p[0]+'" cy="'+p[1]+'" r="20" fill="'+CARD+'" stroke="'+PL+'" stroke-width="2.2" style="pointer-events:none"/><text x="'+p[0]+'" y="'+p[1]+'" text-anchor="middle" dominant-baseline="central" style="font-size:17px;font-weight:700;fill:'+PL+';pointer-events:none">'+v+'</text>'}
+  return s+'</svg>';
+}
+
+/* ---------- Prim bez kopca: prosty graf ---------- */
+var PN_N={A:[120,90],B:[380,60],C:[300,300],D:[640,240]};
+var PN_E=[['A','B',2],['A','C',3],['B','C',1],['B','D',4],['C','D',5]];
+var PN_M={A:{B:2,C:3},B:{A:2,C:1,D:4},C:{A:3,B:1,D:5},D:{B:4,C:5}};
+var PN=[
+{tr:'',T:[],b:{A:0,B:'∞',C:'∞',D:'∞'},p:{A:'–',B:'–',C:'–',D:'–'},u:null,ch:[],t:'Start: best[A] = 0, pozostałe best = ∞. Żaden wierzchołek nie jest jeszcze w drzewie.'},
+{tr:'A',T:[],b:{A:0,B:2,C:3,D:'∞'},p:{A:'–',B:'A',C:'A',D:'–'},u:'A',ch:['B','C'],t:'Najmniejsze best ma A (0), więc A wchodzi do drzewa. Przeglądamy wiersz A: B = 2 < ∞ i C = 3 < ∞, więc poprawiamy best[B] i best[C], a parent ustawiamy na A. D zostaje ∞, bo krawędzi A–D nie ma.'},
+{tr:'AB',T:['AB'],b:{A:0,B:2,C:1,D:4},p:{A:'–',B:'A',C:'B',D:'B'},u:'B',ch:['C','D'],t:'Najmniejsze best spoza drzewa ma B (2), więc dołączamy krawędź parent[B]–B, czyli A–B. Wiersz B: C = 1 < 3, więc best[C] = 1 i parent[C] = B. D = 4 < ∞, więc best[D] = 4 i parent[D] = B.'},
+{tr:'ABC',T:['AB','BC'],b:{A:0,B:2,C:1,D:4},p:{A:'–',B:'A',C:'B',D:'B'},u:'C',ch:[],t:'Najmniejsze best ma C (1), więc dołączamy krawędź B–C. Wiersz C: D = 5, ale to nie jest mniej niż obecne best[D] = 4, więc nic się nie zmienia.'},
+{tr:'ABCD',T:['AB','BC','BD'],b:{A:0,B:2,C:1,D:4},p:{A:'–',B:'A',C:'B',D:'B'},u:'D',ch:[],t:'Zostaje D (4), więc dołączamy krawędź B–D. Wszystkie wierzchołki są w drzewie: MST = A–B, B–C, B–D, suma wag 2 + 1 + 4 = 7. Krawędzie AC (3) i CD (5) nie weszły.'}];
+function pnMatrix(s){var V='ABCD'.split('');var h='<table class="mx"><tr><th></th>'+V.map(function(v){return '<th>'+v+'</th>'}).join('')+'</tr>';
+  V.forEach(function(r){h+='<tr'+(r===s.u?' style="background:'+YEL+'"':'')+'><th>'+r+'</th>'+V.map(function(c){return '<td>'+(r===c?'–':(PN_M[r][c]!=null?PN_M[r][c]:'∞'))+'</td>'}).join('')+'</tr>'});return h+'</table>'}
+function pnArr(s){var V='ABCD'.split('');
+  function row(lbl,f,hl){return '<tr><th style="text-align:left">'+lbl+'</th>'+V.map(function(v){var c=hl&&s.ch.indexOf(v)>=0;return '<td'+(c?' style="background:'+CORAL+'"':'')+'>'+f(v)+'</td>'}).join('')+'</tr>'}
+  return '<table class="mx"><tr><th></th>'+V.map(function(v){return '<th>'+v+'</th>'}).join('')+'</tr>'+row('best',function(v){return s.b[v]},1)+row('parent',function(v){return s.p[v]},1)+row('in_tree',function(v){return s.tr.indexOf(v)>=0?'True':'False'},0)+'</table>'}
+
+/* ---------- komponenty ---------- */
+var st={pi:0,ki:0,ui:0,pn:0,cg:[]};
+function step(n,d,len){st[n]=Math.max(0,Math.min(len-1,st[n]+d));R()}
+function stepper(n,len){var v=st[n];return '<div class="steps"><button class="btn" '+(v==0?'disabled':'')+' onclick="step(\''+n+'\',-1,'+len+')">◀ Krok</button><button class="btn pri" '+(v==len-1?'disabled':'')+' onclick="step(\''+n+'\',1,'+len+')">Krok ▶</button><button class="btn" onclick="st.'+n+'=0;R()">Od nowa</button><span class="muted">stan '+v+' z '+(len-1)+'  (↑ ↓ na klawiaturze)</span></div>'}
+function pseudo(s,cls){return '<pre'+(cls?' class="'+cls+'"':'')+'>'+s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/#(.*)$/gm,'<i>#$1</i>')+'</pre>'}
+function leaf(x,y,rot,c,sc){return '<ellipse cx="'+x+'" cy="'+y+'" rx="'+(26*sc)+'" ry="'+(60*sc)+'" fill="'+c+'" transform="rotate('+rot+' '+x+' '+y+')"/>'}
+function deco(){return '<svg viewBox="0 0 360 380" role="img" aria-label="Dekoracyjne liście">'+leaf(220,150,18,PINK,1.5)+leaf(120,220,-24,CORAL,1.35)+leaf(260,260,30,YEL,1.1)+leaf(60,120,-8,PINK,.8)+leaf(300,90,40,CORAL,.7)+'<circle cx="150" cy="150" r="22" fill="'+CARD+'" stroke="'+PL+'" stroke-width="3"/><circle cx="270" cy="210" r="22" fill="'+CARD+'" stroke="'+PL+'" stroke-width="3"/><circle cx="190" cy="300" r="22" fill="'+CARD+'" stroke="'+PL+'" stroke-width="3"/><line x1="150" y1="150" x2="270" y2="210" stroke="'+PL+'" stroke-width="4"/><line x1="270" y1="210" x2="190" y2="300" stroke="'+PL+'" stroke-width="4"/></svg>'}
+
+var PYCODE=['import heapq','','def prim(graph, start):','    # graph: {wierzchołek: [(waga, sąsiad), ...]}','    S = {start}','    T = []','    heap = [(w, start, v) for w, v in graph[start]]','    heapq.heapify(heap)','    while heap and len(T) < len(graph) - 1:','        w, u, v = heapq.heappop(heap)  # najlżejsza krawędź','        if v in S:','            continue  # utworzyłaby cykl','        S.add(v)','        T.append((u, v, w))','        for w2, x in graph[v]:','            if x not in S:','                heapq.heappush(heap, (w2, v, x))','    return T'].join('\n');
+
+/* ---------- slajdy ---------- */
+var S=[
+function(){return '<div class="grid" style="grid-template-columns:1.25fr .75fr;align-items:center;min-height:440px"><div><h1>Minimalne drzewa<br>rozpinające</h1><p style="font-size:19px;max-width:560px;margin:20px 0 26px">Algorytmy Prima i Kruskala oraz problem połączenia wszystkich punktów sieci przy minimalnym całkowitym koszcie. Zastosowania w projektowaniu infrastruktury.</p><button class="btn pri" onclick="go(1)">Zaczynamy</button></div>'+deco()+'</div>'},
+function(){return '<h2>Problem: połączyć wszystkie punkty najmniejszym kosztem</h2><div class="grid" style="grid-template-columns:1.55fr 1fr;align-items:center">'+graph(NB,EL,big({label:'Graf ważony o sześciu wierzchołkach'}))+'<div><div class="card pink"><h3>Graf ważony</h3>Wierzchołki to punkty sieci, krawędzie to możliwe połączenia, a liczba na krawędzi to jej waga (koszt budowy). Suma wag wszystkich krawędzi wynosi 45.</div><div class="card" style="margin-top:14px"><h3>Szukamy zestawu krawędzi, który</h3>1. łączy wszystkie wierzchołki,<br>2. nie tworzy cykli,<br>3. ma jak najmniejszą sumę wag.</div></div></div>'},
+function(){
+ var M={A:[50,40],B:[190,40],C:[190,150],D:[50,150]},E4=[['A','B'],['B','C'],['C','D'],['D','A'],['A','C']];
+ function one(sel,title,sub,c){return '<div class="card '+c+'"><h3>'+title+'</h3>'+graph(M,E4,{w:240,h:190,r:17,nolabel:1,es:function(k){return sel.indexOf(k)>=0?'take':'dim'},label:title})+'<div style="font-size:14px">'+sub+'</div></div>'}
+ return '<h2>Czym jest drzewo rozpinające?</h2><div class="card" style="margin-bottom:14px"><b>Drzewo rozpinające</b> (ang. <i>spanning tree</i>) grafu spójnego to podgraf, który zawiera <b>wszystkie</b> wierzchołki grafu, jest <b>spójny</b>  i <b>nie ma cykli</b>.</div><div class="grid g3">'+one(['AB','BC','CD'],'Tak: drzewo rozpinające','3 krawędzie, wszystkie wierzchołki połączone, brak cyklu.','pink')+one(['AB','BC','AC','CD'],'Nie: cykl','Cykl A–B–C: jedna krawędź za dużo.','')+one(['AB','CD'],'Nie: niespójny','{A,B} i {C,D} to dwie osobne części.','')+'</div>'},
+function(){
+ var row=[5,4,3,2,1].map(function(n,i){return '<span class="chip'+(i==4?' take':'')+'">'+n+' '+plPod(n)+'</span>'+(i<4?'<b>→</b>':'')}).join(' ');
+ var I=cgInfo(),msg;
+ if(I.cyc)msg='<span style="color:#b0001a;font-weight:700">Wykryto cykl: wybranych krawędzi jest więcej niż n − liczba spójnych części.</span>';
+ else if(I.c==1)msg='<b>Drzewo rozpinające!</b> Graf jest spójny i bez cyklu, a krawędzi jest n−1 = 4.';
+ else msg='Graf niespójny: '+I.c+' '+(I.c<5?'osobne':'osobnych')+' '+plPod(I.c)+'.';
+ return '<h2>Własności drzewa rozpinającego</h2><div class="grid g2" style="align-items:start"><div><div class="card yellow"><h3>Dlaczego dokładnie n−1 krawędzi?</h3>Na starcie n wierzchołków to n osobnych poddrzew. Każda krawędź, która nie tworzy cyklu, łączy dwa poddrzewa w jedno, czyli zmniejsza ich liczbę o 1. Żeby z n zrobić 1, trzeba dokładnie n−1 takich krawędzi.<div style="margin-top:6px">'+row+'</div></div><div class="card" style="margin-top:12px"><h3>Własności drzewa o n wierzchołkach</h3>• ma dokładnie <b>n−1</b> krawędzi,<br>• między dwoma wierzchołkami jest dokładnie jedna <b>ścieżka</b>,<br>• <b>dodanie</b> krawędzi tworzy dokładnie jeden cykl,<br>• <b>usunięcie</b> krawędzi rozbija je na dwie części,<br>• mniej niż n−1 krawędzi: graf niespójny, więcej: cykl.</div></div><div><h3>Sprawdź</h3><p class="muted" style="margin:0">Klikaj krawędzie, żeby je wybrać. Połącz wszystkie wierzchołki bez cyklu. Ile krawędzi potrzeba?</p>'+cgGraph()+'<div class="card" style="padding:8px 14px"><div class="grid g3" style="gap:8px;text-align:center"><div><div class="stat">5</div><div class="muted">wierzchołki n</div></div><div><div class="stat">'+I.m+'</div><div class="muted">wybrane krawędzie</div></div><div><div class="stat">'+I.c+'</div><div class="muted">spójne części</div></div></div><p style="min-height:2.9em;margin:6px 0">'+msg+'</p><button class="btn" onclick="st.cg=[];R()">Wyczyść</button></div></div></div>'},
+function(){
+ var cut='<line x1="247" y1="10" x2="204" y2="362" stroke="'+PL+'" stroke-width="3" stroke-dasharray="10 8"/><text x="60" y="26" style="font-size:16px;font-weight:700;fill:'+PL+'">grupa S = {A, F}</text><text x="300" y="26" style="font-size:16px;font-weight:700;fill:'+PL+'">pozostałe wierzchołki</text>';
+ return '<h2>MST, czyli minimalne drzewo rozpinające</h2><p style="margin-top:-4px"><b>Minimum Spanning Tree (MST)</b>: drzewo rozpinające o najmniejszej możliwej sumie wag krawędzi.</p><div class="grid" style="grid-template-columns:1.5fr 1fr;align-items:center"><div>'+graph(NB,EL,big({es:function(k){return k==='AB'?'take':(k==='BF'||k==='EF'?'cand':'dim')},nf:function(v){return v==='A'||v==='F'?PINK:null},lt:{BF:0.25},extra:cut,label:'Cięcie grafu na dwie grupy wierzchołków'}))+legend(['take','cand'],['Najlżejsza krawędź przecinająca cięcie: należy do MST','Pozostałe krawędzie przecinające cięcie']).replace(/<\/div>$/,'<span><svg width="18" height="18"><circle cx="9" cy="9" r="7" fill="'+PINK+'" stroke="'+PL+'" stroke-width="2"/></svg>Wierzchołki grupy S</span></div>')+'</div><div><div class="card pink"><h3>Zasada cięcia</h3>Podziel wierzchołki na dwie grupy. Spośród krawędzi łączących obie grupy ta o <b>najmniejszej wadze</b> (najlżejsza) zawsze należy do MST. Tu: AB (4) &lt; BF (5) &lt; EF (6). Krawędź AF leży wewnątrz grupy S, więc nie przecina cięcia i nie uczestniczy w tym porównaniu.</div><div class="card" style="margin-top:12px"><h3>Dlaczego?</h3>Weź dowolne drzewo rozpinające, które nie zawiera AB, i dodaj do niego AB: powstanie cykl, który przechodzi przez cięcie jeszcze raz, inną, cięższą krawędzią. Usunięcie tej krawędzi daje drzewo o mniejszej sumie wag, więc poprzednie nie było minimalne.</div></div></div><p>Przy różnych wagach krawędzi MST jest tylko jedno. W naszym grafie wagi są różne, więc Prim i Kruskal muszą zwrócić to samo drzewo.</p>'},
+function(){return '<h2>Algorytm Prima: start z jednego wierzchołka</h2><div class="grid" style="grid-template-columns:1fr 462px;align-items:center;margin-top:28px"><div>'+graph(NB,EL,big({vb:'60 30 640 320',nf:function(v){return v==='A'?PINK:null},extra:'<text x="99" y="68" text-anchor="middle" style="font-size:18px;font-weight:700;fill:'+PL+'">start</text>',label:'Algorytm Prima zaczyna w wierzchołku A'}))+'</div><div><div class="card yellow">Zaczynamy od jednego wierzchołka. W każdym kroku dołączamy do drzewa <b>najlżejszą spośród krawędzi łączących drzewo z wierzchołkiem spoza niego</b>. To zasada cięcia stosowana raz za razem, gdzie grupą S są wierzchołki już w drzewie.</div>'+pseudo('T = []                       # krawędzie MST\nS = {start}                  # wierzchołki drzewa\nwhile len(T) < n - 1:        # MST ma n−1 krawędzi\n    # najlżejsza krawędź (u, v): u w S, v poza S\n    (u, v) = min_edge(S)\n    T.append((u, v))\n    S.add(v)','py')+'</div></div>'},
+function(){var s=PR[st.pi];
+ var es=function(k){return s.T.indexOf(k)>=0?'take':(s.C.indexOf(k)>=0?'cand':(s.X.indexOf(k)>=0?'rej':'dim'))};
+ var cost=s.T.reduce(function(a,k){return a+WT[k]},0);
+ return '<h2>Algorytm Prima krok po kroku</h2><div class="grid" style="grid-template-columns:1.75fr 1fr;align-items:start"><div>'+graph(NB,EL,big({es:es,nf:function(v){return s.S.indexOf(v)>=0?PINK:null},label:'Stan algorytmu Prima'}))+legend(['take','cand','rej'])+'<div class="muted">Odrzucone krawędzie: tak działa wersja z kopcem (slajd 8). Krawędź zostaje w kopcu i jest pomijana dopiero przy wyjęciu.</div></div><div><div class="card"><h3>Wierzchołki drzewa S</h3>{'+s.S.split('').join(', ')+'}<h3 style="margin-top:10px">Wybrane krawędzie</h3>'+(s.T.length?s.T.map(function(k){return '<span class="chip take">'+k+' ('+WT[k]+')</span>'}).join(''):'<span class="muted">jeszcze żadnej</span>')+'<h3 style="margin-top:10px">Kandydaci</h3>'+(s.C.map(function(k){return '<span class="chip" style="background:'+YEL+';border-color:'+YEL+'">'+k+' ('+WT[k]+')</span>'}).join('')||'<span class="muted">brak</span>')+(s.X.length?'<h3 style="margin-top:10px">Odrzucone (oba końce w S, byłby cykl)</h3>'+s.X.map(function(k){return '<span class="chip rej">'+k+' ('+WT[k]+')</span>'}).join(''):'')+'<div class="muted" style="margin-top:8px">Suma wag dotąd: '+cost+'</div></div></div></div><p class="say">'+s.t+'</p>'+stepper('pi',PR.length)},
+function(){return '<h2>Algorytm Prima z kopcem</h2><div class="grid g2"><div>'+pseudo('S = {start}\nT = []\nheap = [(weight(start, x), start, x) for x in neighbors(start)]\nwhile len(T) < n - 1:        # MST ma n−1 krawędzi\n    (w, u, v) = pop(heap)        # najlżejsza krawędź\n    if v in S:\n        continue                 # utworzyłaby cykl\n    S.add(v)\n    T.append((u, v))\n    for x in neighbors(v):\n        if x not in S:\n            push(heap, (weight(v, x), v, x))','py')+'<div class="card yellow" style="margin-top:12px"><h3>Po co kopiec?</h3>W każdym kroku potrzebujemy krawędzi o najmniejszej wadze spośród kandydatów. Kopiec daje ją od razu: operacje <code>pop</code> i <code>push</code> kosztują tylko O(log₂ E) i nie trzeba przeszukiwać wszystkich kandydatów.<br><b>Złożoność całego algorytmu: O(E log₂ V)</b>: najwyżej E operacji po O(log₂ E), a log₂ E ≤ 2 log₂ V (szczegóły: slajd 15).</div></div><div>'+pseudo(PYCODE,'py')+'</div></div>'},
+function(){return '<h2>Algorytm Prima bez kopca</h2><div class="grid g2" style="align-items:start"><div><p style="margin-top:0">Zamiast kopca krawędzi każdy wierzchołek v spoza drzewa pamięta jedną liczbę: <b>best[v]</b>, czyli najmniejszą wagę krawędzi łączącej v z drzewem. Graf zapisujemy jako macierz wag.</p>'+pseudo('T = []\nfor v in V:\n    best[v] = inf    # najlżejsza krawędź do drzewa\n    parent[v] = None\n    in_tree[v] = False\nbest[start] = 0\nfor i in range(n):\n    u = argmin(best, not in_tree)  # skan: V\n    in_tree[u] = True\n    if parent[u] is not None:\n        T.append((parent[u], u))\n    for x in V:                    # skan: V\n        if in_tree[x]:\n            continue\n        if weight(u, x) < best[x]:\n            best[x] = weight(u, x)\n            parent[x] = u','py')+'<div class="card yellow"><h3>Skąd O(V²)?</h3>Pętla główna wykonuje się V razy, a w każdym obrocie są dwa skany po V wierzchołków. Razem V · 2V = O(V²), niezależnie od liczby krawędzi.</div></div><div><div class="card"><h3>Co trzymamy w pamięci</h3>• macierz wag V × V: waga krawędzi albo ∞, gdy jej nie ma,<br>• <b>best[v]</b>: waga najlżejszej krawędzi z v do drzewa,<br>• <b>parent[v]</b>: drugi koniec tej krawędzi,<br>• <b>in_tree[v]</b>: czy v jest już w drzewie.<br>Krok po kroku na prostym grafie: następny slajd.</div><div style="height:12px"></div><div class="card pink"><h3>Kiedy ta wersja?</h3>W grafie gęstym (E ≈ V²) samo odczytanie grafu kosztuje V², a wersja z kopcem dałaby V² log₂ V. Wtedy Prim bez kopca jest szybszy.</div></div></div>'},
+function(){var s=PN[st.pn];
+ var es=function(k){if(s.T.indexOf(k)>=0)return 'take';if(s.u&&k.indexOf(s.u)>=0&&s.tr.indexOf(k.replace(s.u,''))<0)return 'cand';return 'dim'};
+ return '<h2>Prim bez kopca krok po kroku</h2><div class="grid" style="grid-template-columns:1.25fr 1fr;align-items:start"><div>'+graph(PN_N,PN_E,big({es:es,nf:function(v){return s.tr.indexOf(v)>=0?PINK:null},ring:function(v){return v===s.u},label:'Prosty graf dla Prima bez kopca'}))+legend(['take','cand'],['Krawędź w MST','Krawędzie z u (przeglądany wiersz)'])+'<div class="muted">Różowe = w drzewie. Obwódka = wierzchołek u dołączony w tym kroku.</div></div><div><h3>Macierz wag</h3>'+pnMatrix(s)+'<h3 style="margin-top:12px">Tablice</h3>'+pnArr(s)+'<div class="muted" style="margin-top:4px">Żółty wiersz = przeglądany wiersz macierzy. Koralowe pola = wartości poprawione w tym kroku.</div></div></div><p class="say" style="height:3.3em;overflow:hidden">'+s.t+'</p>'+stepper('pn',PN.length)},
+function(){return '<h2>Algorytm Kruskala: łączenie poddrzew</h2><div class="grid g2"><div class="card pink">Prim rozrasta jedno drzewo. Kruskal zaczyna od <b>lasu</b>: każdy wierzchołek to osobne poddrzewo. Krawędzie rozpatrujemy od najmniejszej wagi i stopniowo łączymy poddrzewa w jedno.<br><b>Dlaczego to działa?</b> Przyjęta krawędź jest najlżejszą z krawędzi wychodzących z poddrzewa jednego z jej końców (lżejsze były rozpatrzone wcześniej), więc z zasady cięcia (slajd 5) należy do MST.</div><div class="card"><h3>Dwie możliwości dla krawędzi (u, v)</h3><b>u i v w różnych poddrzewach</b> → dodajemy krawędź, poddrzewa się łączą.<br><b>u i v w tym samym poddrzewie</b> → odrzucamy, bo powstałby cykl.</div></div>'+pseudo('edges = sort(edges, by=weight)   # rosnąco po wadze\nparent = {v: v for v in V}       # każdy wierzchołek = osobne poddrzewo\nT = []\nfor (u, v) in edges:\n    if find(u) != find(v):       # różne poddrzewa\n        T.append((u, v))\n        union(u, v)              # łączymy poddrzewa\n    else:\n        continue                 # byłby cykl\n    if len(T) == n - 1:\n        break')+'<p class="muted" style="margin:0"><code>find(x)</code> zwraca korzeń poddrzewa, do którego należy x, a <code>union(u, v)</code> łączy dwa poddrzewa w jedno. Szczegóły: slajdy 13–14.</p>'},
+function(){var s=KR[st.ki];
+ var es=function(k){return s.T.indexOf(k)>=0?'take':(s.R.indexOf(k)>=0?'rej':'dim')};
+ var nf=function(v){for(var i=0;i<s.I.length;i++){if(s.I[i][0].indexOf(v)>=0)return COL[s.I[i][1]]}return null};
+ var seen={};s.I.forEach(function(i){i[0].split('').forEach(function(c){seen[c]=1})});
+ var isl=s.I.map(function(i){return '{'+i[0].split('').join(', ')+'}'}).concat('ABCDEF'.split('').filter(function(v){return !seen[v]}).map(function(v){return '{'+v+'}'})).join('  ');
+ var chips=SORTED.map(function(e,j){var c='chip';if(s.T.indexOf(e)>=0)c+=' take';else if(s.R.indexOf(e)>=0)c+=' rej';else if(j>s.cur&&s.cur>=0&&s.T.length==5)c+=' off';if(j==s.cur)c+=' cur';return '<span class="'+c+'">'+e+' ('+WT[e]+')</span>'}).join('');
+ return '<h2>Algorytm Kruskala krok po kroku</h2><div class="grid" style="grid-template-columns:1.75fr 1fr;align-items:start"><div>'+graph(NB,EL,big({es:es,nf:nf,ring:function(v){return s.cur>=0&&SORTED[s.cur].indexOf(v)>=0},label:'Stan algorytmu Kruskala'}))+legend(['take','rej'])+'<div class="muted">Kolor wierzchołka = poddrzewo (jednowierzchołkowe są białe). Obwódka = końce rozpatrywanej krawędzi.</div>'+'</div><div><div class="card" style="padding:8px 14px"><span class="muted">Krawędzie posortowane rosnąco po wadze:</span><br>'+chips+'</div><div class="card" style="margin-top:10px"><h3>Poddrzewa</h3><div style="font-size:18px;font-weight:600">'+isl+'</div><h3 style="margin-top:10px">Wybrane krawędzie</h3>'+(s.T.map(function(k){return '<span class="chip take">'+k+'</span>'}).join('')||'<span class="muted">jeszcze żadnej</span>')+'<div class="muted" style="margin-top:8px">Krawędzie: '+s.T.length+' z 5. Suma wag: '+s.T.reduce(function(a,k){return a+WT[k]},0)+'</div></div></div></div><p class="say">'+s.t+'</p>'+stepper('ki',KR.length)},
+function(){return '<h2>Jak najszybciej wykryć cykl w Kruskalu</h2><div class="card yellow"><b>Reguła:</b> krawędź (u, v) tworzy cykl <b>wtedy i tylko wtedy</b>, gdy u i v są już w tym samym poddrzewie. Pytamy więc: czy <code>find(u) == find(v)</code>?</div><table style="margin-top:12px"><tr><th>Sposób sprawdzania</th><th>Jedno sprawdzenie</th><th>Cały Kruskal</th></tr><tr><td>Przeszukanie wybranych krawędzi (DFS/BFS): czy istnieje ścieżka u→v</td><td>O(V)</td><td>O(E · V)</td></tr><tr><td>Lista zbiorów wierzchołków (szukanie u i v oraz scalanie zbiorów)</td><td>O(V)</td><td>O(E · V)</td></tr><tr><td><b>Union-Find</b>: każde poddrzewo ma reprezentanta (korzeń)</td><td><b>zamortyzowane O(log₂ V)</b></td><td><b>O(E log₂ V)</b>, tyle samo co sortowanie</td></tr></table><div class="grid g2" style="margin-top:14px"><div class="card pink"><h3>Idea Union-Find</h3>Każdy wierzchołek pamięta rodzica, a korzeń poddrzewa wskazuje na siebie. <code>find(x)</code> idzie po rodzicach do korzenia. Dwa wierzchołki są w tym samym poddrzewie, gdy mają ten sam korzeń. Połączenie poddrzew to podpięcie jednego korzenia pod drugi.</div><div class="card"><h3>Kompresja ścieżek</h3>Przy <code>find</code> podpinamy wszystkie odwiedzone wierzchołki od razu pod korzeń. Kolejne wyszukiwania są wtedy krótkie. Przy samej kompresji jedna operacja kosztuje zamortyzowane O(log₂ V). Koszt niemal stały daje dopiero połączenie z optymalizacją „ranga”, ale dla Kruskala nie ma to znaczenia, bo sortowanie i tak kosztuje O(E log₂ V).</div></div>'},
+function(){var s=UF[st.ui];
+ var chips=SORTED.slice(0,7).map(function(e){var c='chip';if(e===s.e){c+=s.rej?' rej':' take';c+=' cur'}return '<span class="'+c+'">'+e+' ('+WT[e]+')</span>'}).join('');
+ return '<h2>Union-Find krok po kroku</h2><div class="grid g2" style="align-items:start"><div>'+pseudo('def find(x):\n    while parent[x] != x:\n        x = parent[x]            # idziemy do rodzica\n    return x                     # korzeń poddrzewa\n\ndef union(u, v):\n    parent[find(u)] = find(v)    # korzeń pod korzeń\n\n# cykl, gdy find(u) == find(v)\n# kompresja ścieżek: odwiedzone wierzchołki\n# podpinamy od razu pod korzeń')+'<div class="card" style="padding:8px 14px"><span class="muted">Kolejność krawędzi w Kruskalu:</span><br>'+chips+'</div><div class="card" style="padding:8px 14px;margin-top:8px;height:5.1em;overflow:hidden"><span class="muted">Krawędzie MST dotąd (to nie są linie struktury Union-Find obok):</span><br>'+(UFT[st.ui].map(function(k){return '<span class="chip take">'+k+'</span>'}).join('')||'<span class="chip" style="visibility:hidden">–</span>')+'</div></div><div>'+forest(s.p,s.ch)+'<div class="muted">Żółty = korzeń (reprezentant poddrzewa), koralowa linia = zmieniony rodzic. Linie w tej strukturze to wskaźniki „rodzic”, a nie krawędzie grafu.</div><div class="card yellow" style="margin-top:8px;height:7.4em;overflow:hidden;font-size:16px;line-height:1.45;visibility:'+(s.x?'visible':'hidden')+'">'+(s.x||'')+'</div></div></div><p class="say" style="height:3.3em;overflow:hidden">'+s.t+'</p>'+stepper('ui',UF.length)},
+function(){return '<h2>Złożoności i wybór algorytmu</h2><div class="grid g2"><div><div class="card pink"><h3>Oznaczenia</h3>V to liczba wierzchołków, E to liczba krawędzi. Przykład: log₂ 1000 ≈ 10, bo 1000 można podzielić na pół około 10 razy, zanim zostanie 1.</div><div class="card" style="margin-top:12px"><h3>Prim bez kopca (slajd 9): O(V²)</h3>V razy szukamy w tablicy best[] wierzchołka o najmniejszej wartości (V kroków) i aktualizujemy wartości pozostałych wierzchołków (V kroków). Razem V · 2V = O(V²).</div><div class="card" style="margin-top:12px"><h3>Prim z kopcem (slajd 8): O(E log₂ V)</h3>Krawędź trafia do kopca, gdy do drzewa wchodzi jej pierwszy koniec, i nigdy drugi raz (warunek x ∉ S). Jest więc najwyżej E wstawień i E wyjęć, każde O(log₂ E). Ponieważ E ≤ V², to log₂ E ≤ log₂ V² = 2 log₂ V, czyli O(log₂ E) = O(log₂ V). Razem 2E · O(log₂ V) = O(E log₂ V).</div><div class="card" style="margin-top:12px"><h3>Kruskal: O(E log₂ V)</h3>Sortowanie E krawędzi to O(E log₂ E) = O(E log₂ V), z tego samego powodu. Potem E razy find/union, każde zamortyzowane O(log₂ V), czyli razem też O(E log₂ V).</div></div><div><h3>Zgadnij i sprawdź: V = 1000</h3><input type="range" min="0" max="100" value="15" id="sl" aria-label="Liczba krawędzi" oninput="upd()"><p>Liczba krawędzi E: <b id="ec"></b> <span class="muted" id="ep"></span></p><div class="muted">Prim bez kopca: ok. V² kroków</div><div style="display:flex;gap:8px;align-items:center"><div style="flex:1"><div class="bar1" id="b1" style="background:'+PINK+'"></div></div><span class="muted" id="n1" style="min-width:130px"></span></div><div class="muted" style="margin-top:6px">Kruskal / Prim z kopcem: ok. E · log₂ V ≈ E · 10 kroków</div><div style="display:flex;gap:8px;align-items:center"><div style="flex:1"><div class="bar2" id="b2" style="background:'+CORAL+'"></div></div><span class="muted" id="n2" style="min-width:130px"></span></div><p id="vd" style="font-weight:700"></p><div class="card yellow" style="margin-top:12px"><b>Wniosek:</b> dla grafów rzadkich (mało krawędzi w stosunku do V²) lepsze są Kruskal i Prim z kopcem, bo ich koszt zależy od liczby krawędzi. Dla grafów gęstych (E bliskie V²) lepszy jest Prim bez kopca, bo jego koszt jest zawsze rzędu V², niezależnie od liczby krawędzi, i nie musi sortować ani obsługiwać kopca z ogromną liczbą krawędzi.</div></div></div>'},
+function(){function c(t,x,cl){return '<div class="card '+cl+'"><h3>'+t+'</h3>'+x+'</div>'}
+ return '<h2>Zastosowania w projektowaniu infrastruktury</h2><div class="grid g3">'+c('Sieci energetyczne i wodociągowe','Wierzchołki to punkty do zasilenia lub zaopatrzenia, wagi to koszt budowy odcinków. MST daje najtańszy szkielet sieci.','pink')+c('Sieci światłowodowe i komputerowe','Łączenie węzłów najmniejszym kosztem okablowania. W sieciach przełączników protokół STP (Spanning Tree Protocol) buduje drzewo rozpinające, które usuwa pętle (według innego kryterium niż suma wag).','yellow')+c('Drogi i koleje','Wstępny projekt minimalnego szkieletu połączeń między miejscowościami.','pink')+'</div><h3 style="margin-top:22px">Ograniczenia MST</h3><div class="grid g2"><div class="card"><b>Brak redundancji.</b> Usunięcie jednej krawędzi rozbija sieć na dwie części, więc w praktyce dodaje się połączenia zapasowe.</div><div class="card"><b>Liczy się tylko suma wag.</b> Ścieżka między dwoma wierzchołkami w MST może być bardzo okrężna, a przepustowość nie jest brana pod uwagę.</div></div>'},
+function(){return '<div class="grid" style="grid-template-columns:1.25fr .75fr;align-items:center;min-height:440px"><div><h1>Dziękuję<br>za uwagę</h1><p style="font-size:19px;max-width:560px;margin:20px 0 0">Pytania?</p></div>'+deco()+'</div>'}
+];
+
+/* ---------- nawigacja ---------- */
+var cur=0;
+function go(d){cur=Math.max(0,Math.min(S.length-1,cur+d));R()}
+var K=1;
+function fitStage(){var k=K=Math.min(innerWidth/1280,innerHeight/720);document.getElementById('stage').style.transform='translate(-50%,-50%) scale('+k+')'}
+function fitSlide(){var m=document.getElementById('slide'),f=document.getElementById('fit'),avail=m.clientHeight;
+  function hh(){return f.getBoundingClientRect().height/K}
+  f.style.transform='';f.style.width='';if(hh()<=avail-2)return;
+  var lo=.4,hi=1;for(var i=0;i<12;i++){var mid=(lo+hi)/2;f.style.width=(100/mid)+'%';f.style.transform='scale('+mid+')';if(hh()<=avail-2)lo=mid;else hi=mid}
+  f.style.width=(100/lo)+'%';f.style.transform='scale('+lo+')'}
+window.addEventListener('resize',function(){fitStage();fitSlide()});
+function R(){
+  document.getElementById('slide').innerHTML='<div id="fit">'+S[cur]()+'</div>';
+  document.getElementById('prev').disabled=cur==0;document.getElementById('next').disabled=cur==S.length-1;
+  document.getElementById('pg').style.width=((cur+1)/S.length*100)+'%';document.getElementById('ct').textContent=(cur+1)+' / '+S.length;
+  if(cur==14)upd();
+  fitSlide();
+}
+function upd(){var q=function(i){return document.getElementById(i)},v=+q('sl').value,Ev=Math.round(999*Math.pow(499500/999,v/100)),a=1e6,b=Ev*10,m=Math.max(a,b),f=function(x){return x.toLocaleString('pl-PL')};
+  q('ec').textContent=f(Ev);q('ep').textContent='(E/V ≈ '+(Ev/1000).toFixed(1).replace('.',',')+')';
+  q('b1').style.width=Math.max(.5,a/m*100)+'%';q('b2').style.width=Math.max(.5,b/m*100)+'%';
+  q('n1').textContent='≈ '+f(a)+' kroków';q('n2').textContent='≈ '+f(b)+' kroków';
+  q('vd').textContent=b<a?'Wygrywa Kruskal / Prim z kopcem: ok. '+Math.round(a/b)+'× mniej pracy.':(b>a?'Wygrywa Prim bez kopca: ok. '+(b/a).toFixed(1).replace('.',',')+'× mniej pracy.':'Remis.');}
+document.getElementById('prev').onclick=function(){go(-1)};document.getElementById('next').onclick=function(){go(1)};
+var STEP={6:['pi',PR.length],9:['pn',PN.length],11:['ki',KR.length],13:['ui',UF.length]};
+document.addEventListener('keydown',function(e){
+  if(e.target.tagName==='INPUT')return;
+  if(e.key==='ArrowRight'||e.key==='PageDown')go(1);else if(e.key==='ArrowLeft'||e.key==='PageUp')go(-1);
+  else if(e.key==='f'||e.key==='F'){if(document.fullscreenElement)document.exitFullscreen();else if(document.documentElement.requestFullscreen)document.documentElement.requestFullscreen()}
+  else if((e.key==='ArrowDown'||e.key==='ArrowUp')&&STEP[cur]){e.preventDefault();step(STEP[cur][0],e.key==='ArrowDown'?1:-1,STEP[cur][1])}
+});
+fitStage();R();
+</script>
+</body>
+</html>
